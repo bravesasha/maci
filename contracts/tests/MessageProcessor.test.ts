@@ -128,7 +128,7 @@ describe("MessageProcessor", () => {
     generatedInputs = poll.processMessages(pollId);
 
     // set the verification keys on the vk smart contract
-    vkRegistryContract.setVerifyingKeys(
+    await vkRegistryContract.setVerifyingKeys(
       STATE_TREE_DEPTH,
       treeDepths.intStateTreeDepth,
       treeDepths.voteOptionTreeDepth,
@@ -136,7 +136,7 @@ describe("MessageProcessor", () => {
       EMode.QV,
       testProcessVk.asContractParam() as IVerifyingKeyStruct,
       testTallyVk.asContractParam() as IVerifyingKeyStruct,
-      { gasLimit: 1000000 },
+      { gasLimit: 2000000 },
     );
     receipt = await tx.wait();
     expect(receipt?.status).to.eq(1);

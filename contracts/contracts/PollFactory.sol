@@ -25,7 +25,7 @@ contract PollFactory is Params, DomainObjs, IPollFactory {
     TreeDepths calldata _treeDepths,
     uint8 _messageBatchSize,
     PubKey calldata _coordinatorPubKey,
-    address _maci
+    ExtContracts calldata _extContracts
   ) public virtual returns (address pollAddr) {
     /// @notice Validate _maxVoteOptions
     /// maxVoteOptions must be less than 2 ** 50 due to circuit limitations;
@@ -35,11 +35,8 @@ contract PollFactory is Params, DomainObjs, IPollFactory {
       revert InvalidMaxVoteOptions();
     }
 
-    /// @notice the smart contracts that a Poll would interact with
-    ExtContracts memory extContracts = ExtContracts({ maci: IMACI(_maci) });
-
     // deploy the poll
-    Poll poll = new Poll(_duration, _maxVoteOptions, _treeDepths, _messageBatchSize, _coordinatorPubKey, extContracts);
+    Poll poll = new Poll(_duration, _maxVoteOptions, _treeDepths, _messageBatchSize, _coordinatorPubKey, _extContracts);
 
     // init Poll
     poll.init();

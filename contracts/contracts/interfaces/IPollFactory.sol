@@ -13,7 +13,7 @@ interface IPollFactory {
   /// @param _treeDepths The depths of the merkle trees
   /// @param _messageBatchSize The size of message batch
   /// @param _coordinatorPubKey The coordinator's public key
-  /// @param _maci The MACI contract interface reference
+  /// @param _extContract The external contract interface references
   /// @return The deployed Poll contract
   function deploy(
     uint256 _duration,
@@ -21,6 +21,6 @@ interface IPollFactory {
     Params.TreeDepths memory _treeDepths,
     uint8 _messageBatchSize,
     DomainObjs.PubKey memory _coordinatorPubKey,
-    address _maci
+    Params.ExtContracts calldata _extContract
   ) external returns (address);
 }

@@ -9,6 +9,7 @@ import type {
   Keypair,
   Message,
   PCommand,
+  PrivKey,
   PubKey,
   StateLeaf,
 } from "maci-domainobjs";
@@ -53,7 +54,7 @@ export interface MaxValues {
  */
 export interface IMaciState {
   // This method is used for signing up users to the state tree.
-  signUp(pubKey: PubKey, initialVoiceCreditBalance: bigint, timestamp: bigint): number;
+  signUp(pubKey: PubKey, initialVoiceCreditBalance: bigint, timestamp: bigint, stateRoot: bigint): number;
   // This method is used for deploying poll.
   deployPoll(
     pollEndTimestamp: bigint,
@@ -73,6 +74,8 @@ export interface IMaciState {
  * An interface which represents the public API of the Poll class.
  */
 export interface IPoll {
+  // Check if nullifier was already used for joining
+  hasJoined(nullifier: bigint): boolean;
   // These methods are used for sending a message to the poll from user
   publishMessage(message: Message, encPubKey: PubKey): void;
   // These methods are used to generate circuit inputs
@@ -104,6 +107,7 @@ export interface IJsonPoll {
   encPubKeys: string[];
   currentMessageBatchIndex: number;
   stateLeaves: IJsonStateLeaf[];
+  pollStateLeaves: IJsonStateLeaf[];
   results: string[];
   numBatchesProcessed: number;
   numSignups: string;
@@ -139,6 +143,32 @@ export interface IProcessMessagesOutput {
   command?: PCommand;
 }
 
+/**
+ * An interface describing the joiningCircuitInputs function arguments
+ */
+export interface IJoiningCircuitArgs {
+  maciPrivKey: PrivKey;
+  stateLeafIndex: bigint;
+  credits: bigint;
+  pollPrivKey: PrivKey;
+  pollPubKey: PubKey;
+}
+/**
+ * An interface describing the circuit inputs to the PollJoining circuit
+ */
+export interface IPollJoiningCircuitInputs {
+  privKey: string;
+  pollPrivKey: string;
+  pollPubKey: string[];
+  stateLeaf: string[];
+  siblings: string[][];
+  indices: string[];
+  nullifier: string;
+  credits: string;
+  stateRoot: string;
+  actualStateTreeDepth: string;
+  inputHash: string;
+}
 /**
  * An interface describing the circuit inputs to the ProcessMessage circuit
  */

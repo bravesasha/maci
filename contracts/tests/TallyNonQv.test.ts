@@ -151,7 +151,7 @@ describe("TallyVotesNonQv", () => {
       EMode.NON_QV,
       testProcessVk.asContractParam() as IVerifyingKeyStruct,
       testTallyVk.asContractParam() as IVerifyingKeyStruct,
-      { gasLimit: 1000000 },
+      { gasLimit: 2000000 },
     );
   });
 
@@ -188,7 +188,7 @@ describe("TallyVotesNonQv", () => {
   describe("after messages processing", () => {
     let tallyGeneratedInputs: ITallyCircuitInputs;
     before(async () => {
-      await pollContract.mergeMaciState();
+      await pollContract.mergeState();
 
       tallyGeneratedInputs = poll.tallyVotes();
     });

@@ -1,13 +1,25 @@
 import { expect } from "chai";
-import { BaseContract, Signer, ZeroAddress } from "ethers";
+import { BaseContract, Signer } from "ethers";
 import { Keypair } from "maci-domainobjs";
 
 import { deployPollFactory, getDefaultSigner } from "../ts";
-import { PollFactory } from "../typechain-types";
+import { MACI, PollFactory, Verifier, VkRegistry } from "../typechain-types";
 
-import { messageBatchSize, maxVoteOptions, treeDepths } from "./constants";
+import {
+  messageBatchSize,
+  initialVoiceCreditBalance,
+  maxVoteOptions,
+  STATE_TREE_DEPTH,
+  treeDepths,
+  ExtContractsStruct,
+} from "./constants";
+import { deployTestContracts } from "./utils";
 
 describe("pollFactory", () => {
+  let maciContract: MACI;
+  let verifierContract: Verifier;
+  let vkRegistryContract: VkRegistry;
+  let extContracts: ExtContractsStruct;
   let pollFactory: PollFactory;
   let signer: Signer;
 
@@ -15,6 +27,12 @@ describe("pollFactory", () => {
 
   before(async () => {
     signer = await getDefaultSigner();
+    const r = await deployTestContracts(initialVoiceCreditBalance, STATE_TREE_DEPTH, signer, true);
+    maciContract = r.maciContract;
+    verifierContract = r.mockVerifierContract as Verifier;
+    vkRegistryContract = r.vkRegistryContract;
+    extContracts = { maci: maciContract, verifier: verifierContract, vkRegistry: vkRegistryContract };
+
     pollFactory = (await deployPollFactory(signer, true)) as BaseContract as PollFactory;
   });
 
@@ -26,7 +44,7 @@ describe("pollFactory", () => {
         treeDepths,
         messageBatchSize,
         coordinatorPubKey.asContractParam(),
-        ZeroAddress,
+        extContracts,
       );
       const receipt = await tx.wait();
       expect(receipt?.status).to.eq(1);
@@ -41,7 +59,7 @@ describe("pollFactory", () => {
           treeDepths,
           messageBatchSize,
           coordinatorPubKey.asContractParam(),
-          ZeroAddress,
+          extContracts,
         ),
       ).to.be.revertedWithCustomError(pollFactory, "InvalidMaxVoteOptions");
     });

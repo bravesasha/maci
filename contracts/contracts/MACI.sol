@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import { IPollFactory } from "./interfaces/IPollFactory.sol";
 import { IMessageProcessorFactory } from "./interfaces/IMPFactory.sol";
 import { ITallyFactory } from "./interfaces/ITallyFactory.sol";
+import { IVerifier } from "./interfaces/IVerifier.sol";
+import { IVkRegistry } from "./interfaces/IVkRegistry.sol";
 import { InitialVoiceCreditProxy } from "./initialVoiceCreditProxy/InitialVoiceCreditProxy.sol";
 import { SignUpGatekeeper } from "./gatekeepers/SignUpGatekeeper.sol";
 import { IMACI } from "./interfaces/IMACI.sol";
@@ -11,7 +13,7 @@ import { Params } from "./utilities/Params.sol";
 import { Utilities } from "./utilities/Utilities.sol";
 import { DomainObjs } from "./utilities/DomainObjs.sol";
 import { CurveBabyJubJub } from "./crypto/BabyJubJub.sol";
-import { InternalLazyIMT, LazyIMTData } from "./trees/LazyIMT.sol";
+import { InternalLeanIMT, LeanIMTData } from "./trees/LeanIMT.sol";
 
 /// @title MACI - Minimum Anti-Collusion Infrastructure Version 1
 /// @notice A contract which allows users to sign up, and deploy new polls
@@ -48,7 +50,7 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
 
   /// @notice The state tree. Represents a mapping between each user's public key
   /// and their voice credit balance.
-  LazyIMTData public lazyIMTData;
+  LeanIMTData public leanIMTData;
 
   /// @notice Address of the SignUpGatekeeper, a contract which determines whether a
   /// user may sign up to vote
@@ -57,6 +59,10 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
   /// @notice The contract which provides the values of the initial voice credit
   /// balance per user
   InitialVoiceCreditProxy public immutable initialVoiceCreditProxy;
+
+  /// @notice The array of the state tree roots for each sign up
+  /// For the N'th sign up, the state tree root will be stored at the index N
+  uint256[] public stateRootsOnSignUp;
 
   /// @notice A struct holding the addresses of poll, mp and tally
   struct PollContracts {
@@ -71,7 +77,8 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
     uint256 indexed _userPubKeyX,
     uint256 indexed _userPubKeyY,
     uint256 _voiceCreditBalance,
-    uint256 _timestamp
+    uint256 _timestamp,
+    uint256 _stateLeaf
   );
   event DeployPoll(
     uint256 _pollId,
@@ -103,8 +110,8 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
     uint8 _stateTreeDepth
   ) payable {
     // initialize and insert the blank leaf
-    InternalLazyIMT._init(lazyIMTData, _stateTreeDepth);
-    InternalLazyIMT._insert(lazyIMTData, BLANK_STATE_LEAF_HASH);
+    InternalLeanIMT._insert(leanIMTData, BLANK_STATE_LEAF_HASH);
+    stateRootsOnSignUp.push(BLANK_STATE_LEAF_HASH);
 
     pollFactory = _pollFactory;
     messageProcessorFactory = _messageProcessorFactory;
@@ -134,7 +141,7 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
     bytes memory _initialVoiceCreditProxyData
   ) public virtual {
     // ensure we do not have more signups than what the circuits support
-    if (lazyIMTData.numberOfLeaves >= uint256(STATE_TREE_ARITY) ** uint256(stateTreeDepth)) revert TooManySignups();
+    if (leanIMTData.size >= uint256(STATE_TREE_ARITY) ** uint256(stateTreeDepth)) revert TooManySignups();
 
     // ensure that the public key is on the baby jubjub curve
     if (!CurveBabyJubJub.isOnCurve(_pubKey.x, _pubKey.y)) {
@@ -152,9 +159,13 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
 
     // Create a state leaf and insert it into the tree.
     uint256 stateLeaf = hashStateLeaf(StateLeaf(_pubKey, voiceCreditBalance, timestamp));
-    InternalLazyIMT._insert(lazyIMTData, stateLeaf);
+    InternalLeanIMT._insert(leanIMTData, stateLeaf);
 
-    emit SignUp(lazyIMTData.numberOfLeaves - 1, _pubKey.x, _pubKey.y, voiceCreditBalance, timestamp);
+    // Store the current state tree root in the array
+    uint256 stateRoot = InternalLeanIMT._root(leanIMTData);
+    stateRootsOnSignUp.push(stateRoot);
+
+    emit SignUp(leanIMTData.size - 1, _pubKey.x, _pubKey.y, voiceCreditBalance, timestamp, stateLeaf);
   }
 
   /// @notice Deploy a new Poll contract.
@@ -194,13 +205,19 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
     // the owner of the message processor and tally contract will be the msg.sender
     address _msgSender = msg.sender;
 
+    ExtContracts memory extContracts = ExtContracts({
+      maci: IMACI(address(this)),
+      verifier: IVerifier(_verifier),
+      vkRegistry: IVkRegistry(_vkRegistry)
+    });
+
     address p = pollFactory.deploy(
       _duration,
       maxVoteOptions,
       _treeDepths,
       _messageBatchSize,
       _coordinatorPubKey,
-      address(this)
+      extContracts
     );
 
     address mp = messageProcessorFactory.deploy(_verifier, _vkRegistry, p, _msgSender, _mode);
@@ -216,7 +233,7 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
 
   /// @inheritdoc IMACI
   function getStateTreeRoot() public view returns (uint256 root) {
-    root = InternalLazyIMT._root(lazyIMTData);
+    root = InternalLeanIMT._root(leanIMTData);
   }
 
   /// @notice Get the Poll details
@@ -229,6 +246,11 @@ contract MACI is IMACI, DomainObjs, Params, Utilities {
 
   /// @inheritdoc IMACI
   function numSignUps() public view returns (uint256 signUps) {
-    signUps = lazyIMTData.numberOfLeaves;
+    signUps = leanIMTData.size;
+  }
+
+  /// @inheritdoc IMACI
+  function getStateRootOnIndexedSignUp(uint256 _index) external view returns (uint256) {
+    return stateRootsOnSignUp[_index];
   }
 }

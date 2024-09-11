@@ -3,6 +3,7 @@ export { MaciState } from "./MaciState";
 export { Poll } from "./Poll";
 
 export {
+  genPollVkSig,
   genProcessVkSig,
   genTallyVkSig,
   packProcessMessageSmallVals,
@@ -12,8 +13,13 @@ export {
 } from "./utils/utils";
 
 export type {
+  IJoiningCircuitArgs,
+  IPollJoiningCircuitInputs,
   ITallyCircuitInputs,
   IProcessMessagesCircuitInputs,
+  IPoll,
+  IJsonPoll,
+  IProcessMessagesOutput,
   CircuitInputs,
   MaxValues,
   TreeDepths,
